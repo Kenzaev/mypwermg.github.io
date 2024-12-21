@@ -13,18 +13,38 @@ document.addEventListener('DOMContentLoaded', () => {
     let theme = 'light';
     const badWords = ['плохое слово', 'еще одно плохое слово']; // Список нежелательных слов
 
+    // Подключение к WebSocket серверу
+    const ws = new WebSocket('ws://localhost:3000');
+
+    ws.onopen = () => {
+        console.log('Соединение установлено');
+    };
+
+    ws.onmessage = (event) => {
+        const data = JSON.parse(event.data);
+        if (data.type === 'join') {
+            addMessage('Система', `${data.username} присоединился к чату`);
+        } else if (data.type === 'leave') {
+            addMessage('Система', `${data.username} покинул чат`);
+        } else if (data.type === 'message') {
+            addMessage(data.username, data.text);
+        }
+        notificationSound.play();
+    };
+
     usernameInput.addEventListener('input', (e) => {
         username = e.target.value;
+        if (username) {
+            ws.send(JSON.stringify({ type: 'join', username }));
+        }
     });
 
     sendButton.addEventListener('click', () => {
         const messageText = messageInput.value.trim();
         if (messageText && username) {
             const filteredMessage = filterBadWords(messageText);
-            addMessage(username, filteredMessage);
+            ws.send(JSON.stringify({ type: 'message', text: filteredMessage }));
             messageInput.value = '';
-            notificationSound.play();
-            saveChatHistory();
         }
     });
 
@@ -73,7 +93,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 imgElement.src = event.target.result;
                 addMessage(username, '', imgElement);
                 notificationSound.play();
-                saveChatHistory();
             };
             reader.readAsDataURL(file);
         }
@@ -100,18 +119,5 @@ document.addEventListener('DOMContentLoaded', () => {
         });
         return filteredMessage;
     }
-
-    function saveChatHistory() {
-        const chatHistory = Array.from(messagesContainer.children).map(messageElement => messageElement.outerHTML).join('');
-        localStorage.setItem('chatHistory', chatHistory);
-    }
-
-    function loadChatHistory() {
-        const chatHistory = localStorage.getItem('chatHistory');
-        if (chatHistory) {
-            messagesContainer.innerHTML = chatHistory;
-        }
-    }
-
-    loadChatHistory();
 });
+
